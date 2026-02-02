@@ -1,37 +1,41 @@
-const express = require('express')
-const path = require('path')
-const app = express()
-const PORT = process.env.PORT || 4000
-const server = app.listen(PORT, () => console.log( `server on port ${PORT}`))
+const express = require('express');
+const path = require('path');
+const http = require('http');
 
-const io = require('socket.io')(server)
+const app = express();
+const PORT = process.env.PORT || 4000;
 
-app.use(express.static(path.join(__dirname, 'public')))
+const server = http.createServer(app);
+const io = require('socket.io')(server);
 
-let socketsConected = new Set()
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+let socketsConnected = new Set();
 
-io.on('connection', onConnected)
+io.on('connection', (socket) => {
+  console.log('Socket connected:', socket.id);
+  socketsConnected.add(socket.id);
 
-function onConnected(socket) {
-  console.log('Socket connected', socket.id)
-  socketsConected.add(socket.id)
-  io.emit('clients-total', socketsConected.size)
+  io.emit('clients-total', socketsConnected.size);
 
   socket.on('disconnect', () => {
-    console.log('Socket disconnected', socket.id)
     setTimeout(() => {
-        socketsConected.delete(socket.id)
-        io.emit('clients-total', socketsConected.size)
-    },100);
-    
-  })
+      socketsConnected.delete(socket.id);
+      io.emit('clients-total', socketsConnected.size);
+    }, 100);
+  });
 
   socket.on('message', (data) => {
-    
-    socket.broadcast.emit('chat-message', data)
-  })
+    socket.broadcast.emit('chat-message', data);
+  });
 
   socket.on('feedback', (data) => {
-    socket.broadcast.emit('feedback',data)
-  })
-}
+    socket.broadcast.emit('feedback', data);
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
